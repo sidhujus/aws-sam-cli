@@ -18,10 +18,14 @@ from samcli.lib.utils.colors import Colored
 from samcli.lib.utils.defaults import get_default_aws_region
 from samcli.lib.utils.profile import list_available_profiles
 
+GITHUB_ACTIONS = "GitHub Actions"
+GITLAB = "GitLab"
+BITBUCKET = "Bitbucket"
+
 
 class GuidedContext:
 
-    SUPPORTED_OIDC_PROVIDERS = {"1": "GitHub Actions"}
+    SUPPORTED_OIDC_PROVIDERS = {"1": GITHUB_ACTIONS, "2": GITLAB, "3": BITBUCKET}
 
     def __init__(
         self,
@@ -41,6 +45,9 @@ class GuidedContext:
         github_org: Optional[str] = None,
         github_repo: Optional[str] = None,
         deployment_branch: Optional[str] = None,
+        gitlab_group: Optional[str] = None,
+        gitlab_project: Optional[str] = None,
+        bitbucket_repo_uuid: Optional[str] = None,
     ) -> None:
         self.profile = profile
         self.stage_configuration_name = stage_configuration_name
@@ -58,6 +65,9 @@ class GuidedContext:
         self.github_repo = github_repo
         self.github_org = github_org
         self.deployment_branch = deployment_branch
+        self.gitlab_group = gitlab_group
+        self.gitlab_project = gitlab_project
+        self.bitbucket_repo_uuid = bitbucket_repo_uuid
         self.color = Colored()
 
     def _prompt_account_id(self) -> None:
@@ -190,13 +200,36 @@ class GuidedContext:
         self.oidc_client_id = click.prompt("Enter the OIDC client ID (sometimes called audience)", type=click.STRING)
 
     def _prompt_subject_claim(self) -> None:
-        if self.oidc_provider == "GitHub Actions":
+        if self.oidc_provider == GITHUB_ACTIONS:
             if not self.github_org:
                 self._prompt_github_org()
             if not self.github_repo:
                 self._prompt_github_repo()
             if not self.deployment_branch:
-                self._prompt_github_branch()
+                self._prompt_deployment_branch()
+        elif self.oidc_provider == GITLAB:
+            if not self.gitlab_group:
+                self._prompt_gitlab_group()
+            if not self.gitlab_project:
+                self._prompt_gitlab_project()
+            if not self.deployment_branch:
+                self._prompt_deployment_branch()
+        elif self.oidc_provider == BITBUCKET:
+            if not self.bitbucket_repo_uuid:
+                self._prompt_repo_uuid()
+
+    def _prompt_repo_uuid(self) -> None:
+        self.bitbucket_repo_uuid = click.prompt("Enter the Bitbucket Repository UUID", type=click.STRING)
+
+    def _prompt_gitlab_group(self) -> None:
+        self.gitlab_group = click.prompt(
+            "Enter the GitLab Group that the code repository belongs to."
+            " If there is no group enter your username instead",
+            type=click.STRING,
+        )
+
+    def _prompt_gitlab_project(self) -> None:
+        self.gitlab_project = click.prompt("Enter GitLab Project name", type=click.STRING)
 
     def _prompt_github_org(self) -> None:
         self.github_org = click.prompt(
@@ -208,7 +241,7 @@ class GuidedContext:
     def _prompt_github_repo(self) -> None:
         self.github_repo = click.prompt("Enter GitHub Repository name", type=click.STRING)
 
-    def _prompt_github_branch(self) -> None:
+    def _prompt_deployment_branch(self) -> None:
         self.deployment_branch = click.prompt(
             "Enter the name of the branch that deployments will occur from", type=click.STRING
         )
@@ -235,12 +268,26 @@ class GuidedContext:
                     (f"OIDC Client ID: {self.oidc_client_id}", self._prompt_oidc_client_id),
                 ]
             )
-            if self.oidc_provider == "GitHub Actions":
+            if self.oidc_provider == GITHUB_ACTIONS:
                 inputs.extend(
                     [
                         (f"GitHub Organization: {self.github_org}", self._prompt_github_org),
                         (f"GitHub Repository: {self.github_repo}", self._prompt_github_repo),
-                        (f"Deployment branch:  {self.deployment_branch}", self._prompt_github_branch),
+                        (f"Deployment branch:  {self.deployment_branch}", self._prompt_deployment_branch),
+                    ]
+                )
+            if self.oidc_provider == GITLAB:
+                inputs.extend(
+                    [
+                        (f"GitLab Group: {self.gitlab_group}", self._prompt_gitlab_group),
+                        (f"GitLab Project: {self.gitlab_project}", self._prompt_gitlab_project),
+                        (f"Deployment branch:  {self.deployment_branch}", self._prompt_deployment_branch),
+                    ]
+                )
+            if self.oidc_provider == BITBUCKET:
+                inputs.extend(
+                    [
+                        (f"Bitbucket Repo UUID: {self.bitbucket_repo_uuid}", self._prompt_repo_uuid),
                     ]
                 )
         else:

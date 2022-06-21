@@ -12,9 +12,12 @@ from samcli.cli.cli_config_file import configuration_option, TomlProvider
 from samcli.cli.main import pass_context, common_options, aws_creds_options, print_cmdline_args
 from samcli.lib.config.samconfig import SamConfig
 from samcli.lib.pipeline.bootstrap.stage import (
+    BITBUCKET_REPO_UUID,
     DEPLOYMENT_BRANCH,
     GITHUB_ORG,
     GITHUB_REPO,
+    GITLAB_GROUP,
+    GITLAB_PROJECT,
     OIDC_CLIENT_ID,
     OIDC_PROVIDER,
     OIDC_PROVIDER_URL,
@@ -23,7 +26,7 @@ from samcli.lib.pipeline.bootstrap.stage import (
 from samcli.lib.telemetry.metric import track_command
 from samcli.lib.utils.colors import Colored
 from samcli.lib.utils.version_checker import check_newer_version
-from .guided_context import GuidedContext
+from .guided_context import BITBUCKET, GITHUB_ACTIONS, GITLAB, GuidedContext
 from ..external_links import CONFIG_AWS_CRED_ON_CICD_URL
 
 SHORT_HELP = "Generates the required AWS resources to connect your CI/CD system."
@@ -35,7 +38,6 @@ This step must be run for each deployment stage in your pipeline, prior to runni
 
 PIPELINE_CONFIG_DIR = os.path.join(".aws-sam", "pipeline")
 PIPELINE_CONFIG_FILENAME = "pipelineconfig.toml"
-GITHUB_ACTIONS = "GitHub Actions"
 LOG = logging.getLogger(__name__)
 
 
@@ -134,6 +136,21 @@ LOG = logging.getLogger(__name__)
     type=click.Choice([GITHUB_ACTIONS]),
     required=False,
 )
+@click.option(
+    "--gitlab-group",
+    help="The GitLab Group that the repository belongs to. " "Only used if using GitLab OIDC for permissions",
+    required=False,
+)
+@click.option(
+    "--gitlab-project",
+    help="The GitLab Project name. " "Only used if using GitLab OIDC for permissions",
+    required=False,
+)
+@click.option(
+    "--bitbucket-repo-uuid",
+    help="The UUID of the Bitbucket Repository. " "Only used if using Bitbucket OIDC for permissions",
+    required=False,
+)
 @common_options
 @aws_creds_options
 @pass_context
@@ -160,6 +177,9 @@ def cli(
     github_repo: Optional[str],
     deployment_branch: Optional[str],
     oidc_provider: Optional[str],
+    gitlab_group: Optional[str],
+    gitlab_project: Optional[str],
+    bitbucket_repo_uuid: Optional[str],
 ) -> None:
     """
     `sam pipeline bootstrap` command entry point
@@ -185,6 +205,9 @@ def cli(
         github_repo=github_repo,
         deployment_branch=deployment_branch,
         oidc_provider=oidc_provider,
+        gitlab_group=gitlab_group,
+        gitlab_project=gitlab_project,
+        bitbucket_repo_uuid=bitbucket_repo_uuid,
     )  # pragma: no cover
 
 
@@ -209,6 +232,9 @@ def do_cli(
     github_repo: Optional[str],
     deployment_branch: Optional[str],
     oidc_provider: Optional[str],
+    gitlab_group: Optional[str],
+    gitlab_project: Optional[str],
+    bitbucket_repo_uuid: Optional[str],
     standalone: bool = True,
 ) -> None:
     """
@@ -226,6 +252,9 @@ def do_cli(
             github_org = oidc_parameters[GITHUB_ORG]
             github_repo = oidc_parameters[GITHUB_REPO]
             deployment_branch = oidc_parameters[DEPLOYMENT_BRANCH]
+            gitlab_group = oidc_parameters[GITLAB_GROUP]
+            gitlab_project = oidc_parameters[GITLAB_PROJECT]
+            bitbucket_repo_uuid = oidc_parameters[BITBUCKET_REPO_UUID]
 
     if interactive:
         if standalone:
@@ -259,6 +288,9 @@ def do_cli(
             oidc_provider=oidc_provider,
             github_org=github_org,
             github_repo=github_repo,
+            gitlab_group=gitlab_group,
+            gitlab_project=gitlab_project,
+            bitbucket_repo_uuid=bitbucket_repo_uuid,
             deployment_branch=deployment_branch,
         )
         guided_context.run()
@@ -278,6 +310,9 @@ def do_cli(
         github_repo = guided_context.github_repo
         deployment_branch = guided_context.deployment_branch
         oidc_provider = guided_context.oidc_provider
+        gitlab_project = guided_context.gitlab_group
+        gitlab_group = guided_context.gitlab_project
+        bitbucket_repo_uuid = guided_context.bitbucket_repo_uuid
 
     subject_claim = None
     missing_parameters_messages: List[str] = []
@@ -288,18 +323,25 @@ def do_cli(
             oidc_provider_url=oidc_provider_url,
             missing_parameters_messages=missing_parameters_messages,
         )
-        if oidc_provider == GITHUB_ACTIONS:
-            _check_github_actions_params(
-                github_org=github_org,
-                github_repo=github_repo,
-                deployment_branch=deployment_branch,
-                missing_parameters_messages=missing_parameters_messages,
-            )
-            subject_claim = _build_oidc_subject_claim(
-                github_org=github_org,
-                github_repo=github_repo,
-                branch=deployment_branch,
-            )
+        _check_oidc_params(
+            github_org=github_org,
+            github_repo=github_repo,
+            deployment_branch=deployment_branch,
+            oidc_provider=oidc_provider,
+            gitlab_group=gitlab_group,
+            gitlab_project=gitlab_project,
+            bitbucket_repo_uuid=bitbucket_repo_uuid,
+            missing_parameters_messages=missing_parameters_messages,
+        )
+        subject_claim = _build_oidc_subject_claim(
+            github_org=github_org,
+            github_repo=github_repo,
+            branch=deployment_branch,
+            gitlab_project=gitlab_project,
+            gitlab_group=gitlab_group,
+            bitbucket_repo_uuid=bitbucket_repo_uuid,
+            oidc_provider=oidc_provider,
+        )
 
         error_string = ""
         for message in missing_parameters_messages:
@@ -381,11 +423,68 @@ def _load_saved_oidc_values() -> Dict[str, Optional[str]]:
     oidc_parameters[GITHUB_ORG] = config.get(GITHUB_ORG)
     oidc_parameters[GITHUB_REPO] = config.get(GITHUB_REPO)
     oidc_parameters[DEPLOYMENT_BRANCH] = config.get(DEPLOYMENT_BRANCH)
+    oidc_parameters[GITLAB_GROUP] = config.get(GITLAB_GROUP)
+    oidc_parameters[GITLAB_PROJECT] = config.get(GITLAB_PROJECT)
+    oidc_parameters[BITBUCKET_REPO_UUID] = config.get(BITBUCKET_REPO_UUID)
     return oidc_parameters
 
 
-def _build_oidc_subject_claim(github_org: Optional[str], github_repo: Optional[str], branch: Optional[str]) -> str:
-    return "repo:{org}/{repo}:ref:refs/heads/{branch}".format(org=github_org, repo=github_repo, branch=branch)
+def _build_oidc_subject_claim(
+    github_org: Optional[str],
+    github_repo: Optional[str],
+    branch: Optional[str],
+    gitlab_group: Optional[str],
+    gitlab_project: Optional[str],
+    bitbucket_repo_uuid: Optional[str],
+    oidc_provider: Optional[str],
+) -> Optional[str]:
+    if oidc_provider == GITHUB_ACTIONS:
+        return "repo:{org}/{repo}:ref:refs/heads/{branch}".format(org=github_org, repo=github_repo, branch=branch)
+    if oidc_provider == GITLAB:
+        return "project_path:{group}/{project}:ref_type:branch:ref:{branch}".format(
+            group=gitlab_group, project=gitlab_project, branch=branch
+        )
+    if oidc_provider == BITBUCKET:
+        return "{repo_uuid}:*".format(repo_uuid=bitbucket_repo_uuid)
+    return None
+
+
+def _check_oidc_params(
+    github_org: Optional[str],
+    github_repo: Optional[str],
+    deployment_branch: Optional[str],
+    oidc_provider: Optional[str],
+    gitlab_group: Optional[str],
+    gitlab_project: Optional[str],
+    bitbucket_repo_uuid: Optional[str],
+    missing_parameters_messages: List[str],
+) -> None:
+    if oidc_provider == GITHUB_ACTIONS:
+        _check_github_actions_params(
+            github_org=github_org,
+            github_repo=github_repo,
+            deployment_branch=deployment_branch,
+            missing_parameters_messages=missing_parameters_messages,
+        )
+    elif oidc_provider == GITLAB:
+        _check_gitlab_params(
+            gitlab_project=gitlab_project,
+            gitlab_group=gitlab_group,
+            deployment_branch=deployment_branch,
+            missing_parameters_messages=missing_parameters_messages,
+        )
+    elif oidc_provider == BITBUCKET:
+        _check_bitbucket_params(
+            bitbucket_repo_uuid=bitbucket_repo_uuid, missing_parameters_messages=missing_parameters_messages
+        )
+
+
+def _check_bitbucket_params(
+    bitbucket_repo_uuid: Optional[str],
+    missing_parameters_messages: List[str],
+) -> None:
+    if not bitbucket_repo_uuid:
+        missing_parameters_messages.append("Missing required parameter '--bitbucket-repo-uuid")
 
 
 def _check_github_actions_params(
@@ -393,18 +492,27 @@ def _check_github_actions_params(
     github_repo: Optional[str],
     deployment_branch: Optional[str],
     missing_parameters_messages: List[str],
-) -> bool:
-    missing_parameters: bool = False
+) -> None:
     if not github_org:
         missing_parameters_messages.append("Missing required parameter '--github-org'")
-        missing_parameters = True
     if not github_repo:
         missing_parameters_messages.append("Missing required parameter '--github-repo'")
-        missing_parameters = True
     if not deployment_branch:
         missing_parameters_messages.append("Missing required parameter '--deployment-branch'")
-        missing_parameters = True
-    return missing_parameters
+
+
+def _check_gitlab_params(
+    gitlab_group: Optional[str],
+    gitlab_project: Optional[str],
+    deployment_branch: Optional[str],
+    missing_parameters_messages: List[str],
+) -> None:
+    if not gitlab_group:
+        missing_parameters_messages.append("Missing required parameter '--gitlab-group'")
+    if not gitlab_project:
+        missing_parameters_messages.append("Missing required parameter '--gitlab-project'")
+    if not deployment_branch:
+        missing_parameters_messages.append("Missing required parameter '--deployment-branch'")
 
 
 def _check_oidc_common_params(

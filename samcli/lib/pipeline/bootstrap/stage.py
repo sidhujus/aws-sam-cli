@@ -14,6 +14,7 @@ import requests
 
 from OpenSSL import SSL, crypto  # type: ignore
 
+from samcli.commands.pipeline.bootstrap.guided_context import BITBUCKET, GITHUB_ACTIONS, GITLAB
 from samcli.lib.config.samconfig import SamConfig
 from samcli.lib.utils.colors import Colored
 from samcli.lib.utils.managed_cloudformation_stack import manage_stack, StackOutput
@@ -33,6 +34,9 @@ OIDC_CLIENT_ID = "oidc_client_id"
 OIDC_PROVIDER = "oidc_provider"
 GITHUB_ORG = "github_org"
 GITHUB_REPO = "github_repo"
+GITLAB_GROUP = "gitlab_group"
+GITLAB_PROJECT = "gitlab_project"
+BITBUCKET_REPO_UUID = "bitbucket_repo_uuid"
 DEPLOYMENT_BRANCH = "deployment_branch"
 REGION = "region"
 
@@ -110,6 +114,9 @@ class Stage:
         oidc_provider_name: Optional[str] = None,
         github_org: Optional[str] = None,
         github_repo: Optional[str] = None,
+        gitlab_group: Optional[str] = None,
+        gitlab_project: Optional[str] = None,
+        bitbucket_repo_uuid: Optional[str] = None,
         deployment_branch: Optional[str] = None,
     ) -> None:
         self.name: str = name
@@ -120,6 +127,9 @@ class Stage:
         self.github_org = github_org
         self.github_repo = github_repo
         self.deployment_branch = deployment_branch
+        self.gitlab_group = gitlab_group
+        self.gitlab_project = gitlab_project
+        self.bitbucket_repo_uuid = bitbucket_repo_uuid
         self.aws_profile: Optional[str] = aws_profile
         self.aws_region: Optional[str] = aws_region
         self.pipeline_user: IAMUser = IAMUser(arn=pipeline_user_arn, comment="Pipeline IAM user")
@@ -358,11 +368,21 @@ class Stage:
                 cmd_names=cmd_names, section="parameters", key=OIDC_CLIENT_ID, value=self.oidc_provider.client_id
             )
             samconfig.put(cmd_names=cmd_names, section="parameters", key=OIDC_PROVIDER, value=self.oidc_provider_name)
-            if self.oidc_provider_name == "GitHub Actions":
+            if self.oidc_provider_name == GITHUB_ACTIONS:
                 samconfig.put(cmd_names=cmd_names, section="parameters", key=GITHUB_ORG, value=self.github_org)
                 samconfig.put(cmd_names=cmd_names, section="parameters", key=GITHUB_REPO, value=self.github_repo)
                 samconfig.put(
                     cmd_names=cmd_names, section="parameters", key=DEPLOYMENT_BRANCH, value=self.deployment_branch
+                )
+            elif self.oidc_provider_name == GITLAB:
+                samconfig.put(cmd_names=cmd_names, section="parameters", key=GITLAB_GROUP, value=self.gitlab_group)
+                samconfig.put(cmd_names=cmd_names, section="parameters", key=GITLAB_PROJECT, value=self.gitlab_project)
+                samconfig.put(
+                    cmd_names=cmd_names, section="parameters", key=DEPLOYMENT_BRANCH, value=self.deployment_branch
+                )
+            elif self.oidc_provider_name == BITBUCKET:
+                samconfig.put(
+                    cmd_names=cmd_names, section="parameters", key=BITBUCKET_REPO_UUID, value=self.bitbucket_repo_uuid
                 )
         # Computing Artifacts bucket name and ECR image repository URL may through an exception if the ARNs are wrong
         # Let's swallow such an exception to be able to save the remaining resources
