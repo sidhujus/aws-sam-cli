@@ -38,8 +38,9 @@ ANY_BITBUCKET_UUID = "ANY_BITBUCKET_UUID"
 ANY_DEPLOYMENT_BRANCH = "ANY_DEPLOYMENT_BRANCH"
 ANY_SUBJECT_CLAIM = "ANY_SUBJECT_CLAIM"
 ANY_BUILT_GITHUB_SUBJECT_CLAIM = "repo:ANY_GITHUB_ORG/ANY_GITHUB_REPO:ref:refs/heads/ANY_DEPLOYMENT_BRANCH"
-ANY_BUILT_GITLAB_SUBJECT_CLAIM = "project_path:ANY_GITLAB_GROUP/ANY_GITLAB_PROJECT:ref_type:branch:ref" \
-                                 ":ANY_DEPLOYMENT_BRANCH"
+ANY_BUILT_GITLAB_SUBJECT_CLAIM = (
+    "project_path:ANY_GITLAB_GROUP/ANY_GITLAB_PROJECT:ref_type:branch:ref" ":ANY_DEPLOYMENT_BRANCH"
+)
 ANY_BUILT_BITBUCKET_SUBJECT_CLAIM = "ANY_BITBUCKET_UUID:*"
 PIPELINE_BOOTSTRAP_COMMAND_NAMES = ["pipeline", "bootstrap"]
 
@@ -519,7 +520,7 @@ class TestCli(TestCase):
             oidc_provider="GitLab",
             gitlab_group=ANY_GITLAB_GROUP,
             gitlab_project=ANY_GITLAB_PROJECT,
-            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID,
         )
 
         # verify
@@ -534,7 +535,7 @@ class TestCli(TestCase):
             oidc_provider="Bitbucket",
             gitlab_group=ANY_GITLAB_GROUP,
             gitlab_project=ANY_GITLAB_PROJECT,
-            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID,
         )
 
         # verify
@@ -549,7 +550,7 @@ class TestCli(TestCase):
             oidc_provider="GitHub Actions",
             gitlab_group=ANY_GITLAB_GROUP,
             gitlab_project=ANY_GITLAB_PROJECT,
-            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID,
         )
 
         # verify
