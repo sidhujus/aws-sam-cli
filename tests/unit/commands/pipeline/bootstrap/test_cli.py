@@ -8,6 +8,8 @@ from samcli.commands.pipeline.bootstrap.cli import (
     _load_saved_pipeline_user_arn,
     _build_oidc_subject_claim,
     _load_saved_oidc_values,
+    _check_gitlab_params,
+    _check_bitbucket_params,
     PIPELINE_CONFIG_FILENAME,
     PIPELINE_CONFIG_DIR,
 )
@@ -30,9 +32,15 @@ ANY_OIDC_CLIENT_ID = "ANY_OIDC_CLIENT_ID"
 ANY_OIDC_PROVIDER = "ANY_OIDC_PROVIDER"
 ANY_GITHUB_ORG = "ANY_GITHUB_ORG"
 ANY_GITHUB_REPO = "ANY_GITHUB_REPO"
+ANY_GITLAB_PROJECT = "ANY_GITLAB_PROJECT"
+ANY_GITLAB_GROUP = "ANY_GITLAB_GROUP"
+ANY_BITBUCKET_UUID = "ANY_BITBUCKET_UUID"
 ANY_DEPLOYMENT_BRANCH = "ANY_DEPLOYMENT_BRANCH"
 ANY_SUBJECT_CLAIM = "ANY_SUBJECT_CLAIM"
-ANY_BUILT_SUBJECT_CLAIM = "repo:ANY_GITHUB_ORG/ANY_GITHUB_REPO:ref:refs/heads/ANY_DEPLOYMENT_BRANCH"
+ANY_BUILT_GITHUB_SUBJECT_CLAIM = "repo:ANY_GITHUB_ORG/ANY_GITHUB_REPO:ref:refs/heads/ANY_DEPLOYMENT_BRANCH"
+ANY_BUILT_GITLAB_SUBJECT_CLAIM = "project_path:ANY_GITLAB_GROUP/ANY_GITLAB_PROJECT:ref_type:branch:ref" \
+                                 ":ANY_DEPLOYMENT_BRANCH"
+ANY_BUILT_BITBUCKET_SUBJECT_CLAIM = "ANY_BITBUCKET_UUID:*"
 PIPELINE_BOOTSTRAP_COMMAND_NAMES = ["pipeline", "bootstrap"]
 
 
@@ -58,6 +66,9 @@ class TestCli(TestCase):
             "oidc_provider": ANY_OIDC_PROVIDER,
             "github_org": ANY_GITHUB_ORG,
             "github_repo": ANY_GITHUB_REPO,
+            "gitlab_group": ANY_GITLAB_GROUP,
+            "gitlab_project": ANY_GITLAB_PROJECT,
+            "bitbucket_repo_uuid": ANY_BITBUCKET_UUID,
             "deployment_branch": ANY_DEPLOYMENT_BRANCH,
         }
 
@@ -91,6 +102,9 @@ class TestCli(TestCase):
             github_repo=None,
             deployment_branch=None,
             oidc_provider=None,
+            gitlab_group=None,
+            gitlab_project=None,
+            bitbucket_repo_uuid=None,
         )
 
     @patch("samcli.commands.pipeline.bootstrap.cli.do_cli")
@@ -192,6 +206,80 @@ class TestCli(TestCase):
         environment_instance.bootstrap.assert_not_called()
         environment_instance.print_resources_summary.assert_not_called()
         environment_instance.save_config_safe.assert_not_called()
+
+    @patch("samcli.commands.pipeline.bootstrap.cli.Stage")
+    def test_bootstrapping_oidc_non_interactive_fails_if_missing_gitlab_parameters(self, environment_mock):
+        # setup
+        environment_instance = Mock()
+        environment_mock.return_value = environment_instance
+        self.cli_context["interactive"] = False
+        self.cli_context["use_oidc_provider"] = True
+        self.cli_context["oidc_provider"] = "GitLab"
+        self.cli_context["gitlab_group"] = None
+        self.cli_context["gitlab_project"] = None
+        self.cli_context["deployment_branch"] = None
+
+        # trigger
+        with self.assertRaises(click.UsageError):
+            bootstrap_cli(**self.cli_context)
+
+        # verify
+        environment_instance.bootstrap.assert_not_called()
+        environment_instance.print_resources_summary.assert_not_called()
+        environment_instance.save_config_safe.assert_not_called()
+
+    @patch("samcli.commands.pipeline.bootstrap.cli.Stage")
+    def test_bootstrapping_oidc_non_interactive_fails_if_missing_bitbucket_parameters(self, environment_mock):
+        # setup
+        environment_instance = Mock()
+        environment_mock.return_value = environment_instance
+        self.cli_context["interactive"] = False
+        self.cli_context["use_oidc_provider"] = True
+        self.cli_context["oidc_provider"] = "Bitbucket"
+        self.cli_context["bitbucket_repo_uuid"] = None
+
+        # trigger
+        with self.assertRaises(click.UsageError):
+            bootstrap_cli(**self.cli_context)
+
+        # verify
+        environment_instance.bootstrap.assert_not_called()
+        environment_instance.print_resources_summary.assert_not_called()
+        environment_instance.save_config_safe.assert_not_called()
+
+    @patch("samcli.commands.pipeline.bootstrap.cli.Stage")
+    def test_bootstrapping_oidc_non_interactive_succeeds_if_not_missing_bitbucket_parameters(self, environment_mock):
+        # setup
+        environment_instance = Mock()
+        environment_mock.return_value = environment_instance
+        self.cli_context["interactive"] = False
+        self.cli_context["use_oidc_provider"] = True
+        self.cli_context["oidc_provider"] = "Bitbucket"
+
+        # trigger
+        bootstrap_cli(**self.cli_context)
+
+        # verify
+        environment_instance.bootstrap.assert_called_once()
+        environment_instance.print_resources_summary.assert_called_once()
+        environment_instance.save_config_safe.assert_called_once()
+
+    @patch("samcli.commands.pipeline.bootstrap.cli.Stage")
+    def test_bootstrapping_oidc_non_interactive_succeeds_if_not_missing_gitlab_parameters(self, environment_mock):
+        # setup
+        environment_instance = Mock()
+        environment_mock.return_value = environment_instance
+        self.cli_context["interactive"] = False
+        self.cli_context["use_oidc_provider"] = True
+        self.cli_context["oidc_provider"] = "GitLab"
+
+        # trigger
+        bootstrap_cli(**self.cli_context)
+
+        # verify
+        environment_instance.bootstrap.assert_called_once()
+        environment_instance.print_resources_summary.assert_called_once()
+        environment_instance.save_config_safe.assert_called_once()
 
     @patch("samcli.commands.pipeline.bootstrap.cli._build_oidc_subject_claim")
     @patch("samcli.commands.pipeline.bootstrap.cli._check_oidc_common_params")
@@ -422,16 +510,50 @@ class TestCli(TestCase):
         self.assertEqual(oidc_values["github_repo"], ANY_GITHUB_REPO)
         self.assertEqual(oidc_values["deployment_branch"], ANY_DEPLOYMENT_BRANCH)
 
-    def test_build_subject_claim_builds_the_correct_subject_claim(self):
+    def test_build_subject_claim_builds_the_correct_subject_claim_gitlab(self):
         # trigger
         subject_claim = _build_oidc_subject_claim(
             github_org=ANY_GITHUB_ORG,
             github_repo=ANY_GITHUB_REPO,
             branch=ANY_DEPLOYMENT_BRANCH,
+            oidc_provider="GitLab",
+            gitlab_group=ANY_GITLAB_GROUP,
+            gitlab_project=ANY_GITLAB_PROJECT,
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
         )
 
         # verify
-        self.assertEqual(subject_claim, ANY_BUILT_SUBJECT_CLAIM)
+        self.assertEqual(subject_claim, ANY_BUILT_GITLAB_SUBJECT_CLAIM)
+
+    def test_build_subject_claim_builds_the_correct_subject_claim_bitbucket(self):
+        # trigger
+        subject_claim = _build_oidc_subject_claim(
+            github_org=ANY_GITHUB_ORG,
+            github_repo=ANY_GITHUB_REPO,
+            branch=ANY_DEPLOYMENT_BRANCH,
+            oidc_provider="Bitbucket",
+            gitlab_group=ANY_GITLAB_GROUP,
+            gitlab_project=ANY_GITLAB_PROJECT,
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
+        )
+
+        # verify
+        self.assertEqual(subject_claim, ANY_BUILT_BITBUCKET_SUBJECT_CLAIM)
+
+    def test_build_subject_claim_builds_the_correct_subject_claim_github(self):
+        # trigger
+        subject_claim = _build_oidc_subject_claim(
+            github_org=ANY_GITHUB_ORG,
+            github_repo=ANY_GITHUB_REPO,
+            branch=ANY_DEPLOYMENT_BRANCH,
+            oidc_provider="GitHub Actions",
+            gitlab_group=ANY_GITLAB_GROUP,
+            gitlab_project=ANY_GITLAB_PROJECT,
+            bitbucket_repo_uuid=ANY_BITBUCKET_UUID
+        )
+
+        # verify
+        self.assertEqual(subject_claim, ANY_BUILT_GITHUB_SUBJECT_CLAIM)
 
     @patch("samcli.commands.pipeline.bootstrap.cli._get_bootstrap_command_names")
     @patch("samcli.commands.pipeline.bootstrap.cli._load_saved_pipeline_user_arn")

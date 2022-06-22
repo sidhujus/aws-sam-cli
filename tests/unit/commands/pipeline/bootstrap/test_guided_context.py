@@ -105,7 +105,7 @@ class TestGuidedContext(TestCase):
     @patch("samcli.commands.pipeline.bootstrap.guided_context.get_current_account_id")
     @patch("samcli.commands.pipeline.bootstrap.guided_context.click")
     @patch("samcli.commands.pipeline.bootstrap.guided_context.GuidedContext._prompt_account_id")
-    def test_guided_context_will_prompt_for_fields_that_are_not_provided_oidc(
+    def test_guided_context_will_prompt_for_fields_that_are_not_provided_oidc_github(
         self, prompt_account_id_mock, click_mock, account_id_mock, oidc_url_validate_mock
     ):
         account_id_mock.return_value = "1234567890"
@@ -114,7 +114,7 @@ class TestGuidedContext(TestCase):
         gc: GuidedContext = GuidedContext(
             image_repository_arn=ANY_IMAGE_REPOSITORY_ARN,  # Exclude ECR repo, it has its own detailed test below
             use_oidc_provider=True,
-            oidc_provider=ANY_OIDC_PROVIDER,
+            oidc_provider="GitHub Actions",
         )
         gc.run()
         prompt_account_id_mock.assert_called_once()
@@ -128,6 +128,60 @@ class TestGuidedContext(TestCase):
         self.assertTrue(self.did_prompt_text_like("GitHub Organization", click_mock.prompt))
         self.assertTrue(self.did_prompt_text_like("GitHub Repository", click_mock.prompt))
         self.assertTrue(self.did_prompt_text_like("branch that deployments", click_mock.prompt))
+
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.GuidedContext._validate_oidc_provider_url")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.get_current_account_id")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.click")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.GuidedContext._prompt_account_id")
+    def test_guided_context_will_prompt_for_fields_that_are_not_provided_oidc_gitlab(
+        self, prompt_account_id_mock, click_mock, account_id_mock, oidc_url_validate_mock
+    ):
+        account_id_mock.return_value = "1234567890"
+        click_mock.confirm.return_value = False
+        click_mock.prompt = Mock(return_value="0")
+        gc: GuidedContext = GuidedContext(
+            image_repository_arn=ANY_IMAGE_REPOSITORY_ARN,  # Exclude ECR repo, it has its own detailed test below
+            use_oidc_provider=True,
+            oidc_provider="GitLab",
+        )
+        gc.run()
+        prompt_account_id_mock.assert_called_once()
+        self.assertTrue(self.did_prompt_text_like("Stage configuration Name", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("Pipeline execution role", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("CloudFormation execution role", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("Artifact bucket", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("region", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("URL of the OIDC provider", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("OIDC Client ID", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("GitLab Group", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("GitLab Project", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("branch that deployments", click_mock.prompt))
+
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.GuidedContext._validate_oidc_provider_url")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.get_current_account_id")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.click")
+    @patch("samcli.commands.pipeline.bootstrap.guided_context.GuidedContext._prompt_account_id")
+    def test_guided_context_will_prompt_for_fields_that_are_not_provided_oidc_bitbucket(
+        self, prompt_account_id_mock, click_mock, account_id_mock, oidc_url_validate_mock
+    ):
+        account_id_mock.return_value = "1234567890"
+        click_mock.confirm.return_value = False
+        click_mock.prompt = Mock(return_value="0")
+        gc: GuidedContext = GuidedContext(
+            image_repository_arn=ANY_IMAGE_REPOSITORY_ARN,  # Exclude ECR repo, it has its own detailed test below
+            use_oidc_provider=True,
+            oidc_provider="Bitbucket",
+        )
+        gc.run()
+        prompt_account_id_mock.assert_called_once()
+        self.assertTrue(self.did_prompt_text_like("Stage configuration Name", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("Pipeline execution role", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("CloudFormation execution role", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("Artifact bucket", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("region", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("URL of the OIDC provider", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("OIDC Client ID", click_mock.prompt))
+        self.assertTrue(self.did_prompt_text_like("Repository UUID", click_mock.prompt))
 
     @patch("samcli.commands.pipeline.bootstrap.guided_context.click")
     def test_guided_context_prompts_oidc_url_if_missing_or_invalid(self, click_mock):
