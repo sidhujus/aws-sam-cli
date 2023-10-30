@@ -28,7 +28,6 @@ fi
 
 set -eux
 
-yum install -y zlib-devel libffi-devel bzip2-devel
 
 echo "Making Folders"
 mkdir -p .build/src
@@ -41,7 +40,7 @@ cd .build/output/openssl
 curl "https://www.openssl.org/source/openssl-1.1.1t.tar.gz" --output openssl-1.1.1.tar.gz
 tar xzf openssl-1.1.1.tar.gz
 cd openssl-1.1.1t
-./config --prefix=/opt/openssl && make && make install
+./config --prefix=/opt/openssl no-zlib && make && make install
 cd ../../..
 
 echo "Copying Source"
@@ -130,16 +129,16 @@ cd ..
 zip -r "$binary_zip_filename" aws-sam-cli-src
 
 echo "Packaging Python Libraries"
-cd python-libraries
-rm -rf ./*.dist-info
-rm -rf ./*.egg-info
-rm -rf ./__pycache__
-rm -rf ./pip
-rm -rf ./easy_install.py
-rm -rf ./pkg_resources
-rm -rf ./setuptools
+#cd python-libraries
+#rm -rf ./*.dist-info
+#rm -rf ./*.egg-info
+#rm -rf ./__pycache__
+#rm -rf ./pip
+#rm -rf ./easy_install.py
+#rm -rf ./pkg_resources
+#rm -rf ./setuptools
 
-rm -rf ./*.so
+#rm -rf ./*.so
 zip -r ../$python_library_zip_filename ./*
 cd ..
 zip -r $python_library_zip_filename aws-sam-cli-src
