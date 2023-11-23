@@ -14,7 +14,7 @@ attrs==23.1.0
     #   jsonschema
     #   referencing
     #   sarif-om
-aws-lambda-builders @ git+https://github.com/sidhujus/aws-lambda-builders.git@pipstuff
+aws-lambda-builders @ git+https://github.com/sidhujus/aws-lambda-builders.git@pipstuff-debug
     # via aws-sam-cli (setup.py)
 aws-sam-translator==1.80.0
     # via
