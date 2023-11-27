@@ -20,7 +20,7 @@ attrs==23.1.0 \
     #   jsonschema
     #   referencing
     #   sarif-om
-aws-lambda-builders==1.42.0 \
+aws-lambda-builders @ git+https://github.com/sidhujus/aws-lambda-builders.git@pipstuff \
     --hash=sha256:c0d3c4e1d9d663ccc9d13470487958fd4cc0918610786a454759b8d383a10043 \
     --hash=sha256:f2d6dc0ca6cb454d4419b8df1e2a5b4dc4973484a16b809bdb8e00620f95e6af
     # via aws-sam-cli (setup.py)
