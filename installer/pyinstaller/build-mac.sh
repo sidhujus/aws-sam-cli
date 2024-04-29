@@ -34,7 +34,7 @@ if [ "$openssl_version" = "" ]; then
 fi
 
 if [ "$python_version" = "" ]; then
-    python_version="3.8.13";
+    python_version="3.12.3";
 fi
 
 if ! [ "$build_binary_name" = "" ]; then
@@ -92,13 +92,15 @@ echo "Installing Python"
 curl "https://www.python.org/ftp/python/${python_version}/Python-${python_version}.tgz" --output python.tgz
 tar -xzf python.tgz
 cd Python-"$python_version"
-./configure --enable-shared
+./configure \
+    --enable-shared \
+    --with-openssl=/usr/local
 make -j8
 sudo make -j8 install
 cd ..
 
 echo "Installing Python Libraries"
-/usr/local/bin/python3.8 -m venv venv
+/usr/local/bin/python3.12 -m venv venv
 ./venv/bin/pip install --upgrade pip
 ./venv/bin/pip install -r src/requirements/reproducible-mac.txt
 
