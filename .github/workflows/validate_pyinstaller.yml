@@ -13,7 +13,6 @@ jobs:
     name: build-pyinstaller-linux
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux2014_x86_64:latest
-    if: github.repository_owner == 'aws'
     strategy:
       fail-fast: false
     steps:
@@ -40,14 +39,13 @@ jobs:
   build-for-mac:
     name: build-pyinstaller-macos
     runs-on: macos-latest
-    if: github.repository_owner == 'aws'
     strategy:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.8"
+          python-version: "3.12"
       - name: Build PyInstaller
         run: |
           chmod +x ./installer/pyinstaller/build-mac.sh
